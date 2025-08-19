@@ -84,13 +84,13 @@ def build_log_sender_tab(tab, controller):
 def build_event_validator_tab(tab, controller):
     """构建事件校验功能相关的UI组件，采用两栏布局"""
     # --- 主体两栏布局 ---
-    tab.grid_columnconfigure(0, weight=0) # 左侧配置栏，不扩展
+    tab.grid_columnconfigure(0, weight=0, minsize=400) # 左侧配置栏，固定宽度400px
     tab.grid_columnconfigure(1, weight=1) # 右侧结果栏，随窗口扩展
     tab.grid_rowconfigure(0, weight=1)
 
     # --- 左侧配置栏 ---
     left_frame = customtkinter.CTkFrame(tab)
-    left_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ns")
+    left_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew") # 使用nsew填充整个单元格
     left_frame.grid_columnconfigure(0, weight=1)
 
     # -- 请求配置区 --
