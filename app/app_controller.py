@@ -65,6 +65,36 @@ class AppController(customtkinter.CTk):
             'http_url': self.http_url.get()
         }
 
+    def import_config_file(self):
+        file_path = filedialog.askopenfilename(
+            title="选择新的配置文件",
+            filetypes=[("YAML Files", "*.yml *.yaml"), ("All Files", "*.* ")]
+        )
+        if file_path:
+            self.log(f"选择的配置文件: {file_path}")
+            try:
+                if config.update_app_config(file_path):
+                    self.log("配置已成功重新加载。")
+                    self.update_ui_from_config()
+                else:
+                    self.log("配置加载失败或文件为空。")
+            except Exception as e:
+                self.log(f"错误: 重新加载配置失败: {e}")
+
+    def update_ui_from_config(self):
+        # Update UI elements with new config values
+        # This needs to be comprehensive, covering all relevant UI elements
+        # that display or use config values.
+        self.udp_ip.set(config.DEFAULT_UDP_IP)
+        self.udp_port.set(config.DEFAULT_UDP_PORT)
+        self.http_url.set(config.DEFAULT_HTTP_URL)
+        self.event_list_url.set(config.DEFAULT_EVENT_LIST_URL)
+        self.event_req_token.set(config.DEFAULT_EVENT_TOKEN)
+        # For the payload textbox, we need to clear and insert
+        self.validator_payload_textbox.delete("1.0", tkinter.END)
+        self.validator_payload_textbox.insert("1.0", config.DEFAULT_EVENT_PAYLOAD)
+        self.log("UI元素已根据新配置更新。")
+
     # ---- General Logging ----
     def log_from_thread(self, message):
         """线程安全地从任何线程记录消息到主日志框。"""

@@ -8,18 +8,28 @@ def create_widgets(controller):
     """
     # ---- 主体网格布局 ----
     controller.grid_columnconfigure(0, weight=1)
-    controller.grid_rowconfigure(0, weight=1) # Tabview将占据大部分空间
+    controller.grid_rowconfigure(0, weight=0) # For the new button row
+    controller.grid_rowconfigure(1, weight=1) # Tabview will now be in row 1
+
+    # ---- 新增：导入配置按钮 ----
+    import_config_button = customtkinter.CTkButton(
+        controller,
+        text="导入配置文件",
+        command=controller.import_config_file # Call the new method in AppController
+    )
+    import_config_button.grid(row=0, column=0, padx=10, pady=10, sticky="nw") # Place at top-left
 
     # ---- 创建Tab视图 ----
     tab_view = customtkinter.CTkTabview(controller)
-    tab_view.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+    # Update row to 1
+    tab_view.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
     tab_log_sender = tab_view.add("日志发送")
     tab_event_validator = tab_view.add("事件校验")
 
     # ---- 日志显示区 (共享) ----
-    # 将日志区放在Tab外部，使其在切换Tab时保持可见
+    # Update row to 2
     controller.log_textbox = customtkinter.CTkTextbox(controller, state="disabled", height=150)
-    controller.log_textbox.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
+    controller.log_textbox.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="nsew")
 
     # ---- 构建“日志发送”选项卡 ----
     build_log_sender_tab(tab_log_sender, controller)

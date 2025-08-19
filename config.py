@@ -36,6 +36,46 @@ def load_config():
 # --- 在模块加载时执行配置加载 ---
 load_config()
 
+# --- 新增：更新配置的函数 ---
+def update_app_config(new_config_path):
+    """
+    从指定文件加载新的配置，并更新全局 APP_CONFIG。
+    """
+    global APP_CONFIG
+    try:
+        with open(new_config_path, 'r', encoding='utf-8') as f:
+            new_data = yaml.safe_load(f)
+            if new_data:
+                APP_CONFIG.clear() # 清除现有配置
+                APP_CONFIG.update(new_data) # 用新配置更新
+                # 重新评估 DEFAULT_* 常量
+                _re_evaluate_default_constants()
+                return True
+            else:
+                print(f"Warning: New config file {new_config_path} is empty.")
+                return False
+    except (FileNotFoundError, yaml.YAMLError) as e:
+        print(f"Error: Could not load new config from {new_config_path}: {e}")
+        return False
+
+def _re_evaluate_default_constants():
+    """
+    重新评估基于 APP_CONFIG 的 DEFAULT_* 常量。
+    """
+    global DEFAULT_UDP_IP, DEFAULT_UDP_PORT, DEFAULT_HTTP_URL
+    global DEFAULT_EVENT_LIST_URL, DEFAULT_EVENT_TOKEN, DEFAULT_EVENT_PAYLOAD
+
+    log_sender_cfg = get_log_sender_config()
+    DEFAULT_UDP_IP = log_sender_cfg.get('udp_ip', '127.0.0.1')
+    DEFAULT_UDP_PORT = str(log_sender_cfg.get('udp_port', 19708))
+    DEFAULT_HTTP_URL = log_sender_cfg.get('http_url', 'http://127.0.0.1:19762/V1/log')
+
+    event_validator_cfg = get_event_validator_config()
+    DEFAULT_EVENT_LIST_URL = event_validator_cfg.get('event_list_url', 'http://127.0.0.1:8080/api/events')
+    DEFAULT_EVENT_TOKEN = event_validator_cfg.get('default_token', '')
+    default_payload_dict = event_validator_cfg.get('default_payload', None)
+    DEFAULT_EVENT_PAYLOAD = json.dumps(default_payload_dict, indent=4, ensure_ascii=False) if default_payload_dict else ""
+
 # --- 提供便捷的配置访问接口 ---
 def get_log_sender_config():
     return APP_CONFIG.get('log_sender', {})
