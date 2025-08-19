@@ -9,40 +9,54 @@ import threading
 import config
 from app.ui_builder import create_widgets
 from app.log_service import LogService
+from app.event_validator import EventValidator
 
 class AppController(customtkinter.CTk):
     """
     主控制器类，负责：
     1. 初始化UI和业务逻辑服务。
     2. 管理UI状态（通过StringVar）。
-    3. 提供UI事件的回调方法，并将业务逻辑委托给LogService。
+    3. 提供UI事件的回调方法，并将业务逻辑委托给相应的服务。
     """
     def __init__(self):
         super().__init__()
 
         # ---- Window and Theme ----
-        self.title("日志发送工具 (Refactored)")
-        self.geometry("800x600")
+        self.title("监管平台日志发送及事件校验工具")
+        self.geometry("1024x768") # 增加默认窗口尺寸
         customtkinter.set_appearance_mode("System")
         customtkinter.set_default_color_theme("blue")
 
         # ---- Data Variables for UI ----
+        # 日志发送
         self.source_dir = tkinter.StringVar()
         self.processed_dir = tkinter.StringVar()
         self.udp_ip = tkinter.StringVar(value=config.DEFAULT_UDP_IP)
         self.udp_port = tkinter.StringVar(value=config.DEFAULT_UDP_PORT)
         self.http_url = tkinter.StringVar(value=config.DEFAULT_HTTP_URL)
+        # 事件校验
+        self.event_list_url = tkinter.StringVar(value=config.DEFAULT_EVENT_LIST_URL)
+        self.event_req_method = tkinter.StringVar(value="POST") # 默认改为POST以匹配载荷
+        self.event_req_token = tkinter.StringVar(value=config.DEFAULT_EVENT_TOKEN)
 
         # ---- Service Layer ----
         self.log_service = LogService(
-            config=self.get_current_config(),
+            config=self.get_current_config,
             logger_callback=self.log_from_thread,
             on_stop_callback=self.on_processing_stopped
         )
+        self.event_validator = EventValidator(
+            logger_callback=self.log_from_thread,
+            complete_event_list=config.get_complete_event_list()
+        )
 
         # ---- UI Creation ----
-        # create_widgets needs access to self to bind commands and variables
         create_widgets(self)
+
+        # ---- Post-UI Initialization ----
+        # 填充默认的请求载荷
+        if config.DEFAULT_EVENT_PAYLOAD:
+            self.validator_payload_textbox.insert("1.0", config.DEFAULT_EVENT_PAYLOAD)
 
     def get_current_config(self):
         return {
@@ -51,17 +65,19 @@ class AppController(customtkinter.CTk):
             'http_url': self.http_url.get()
         }
 
+    # ---- General Logging ----
     def log_from_thread(self, message):
-        """A thread-safe method to log messages from other threads."""
+        """线程安全地从任何线程记录消息到主日志框。"""
         self.after(0, self.log, message)
 
     def log(self, message):
-        """Logs a message to the textbox, must be called from the main thread."""
+        """将消息记录到主日志文本框，必须在主线程中调用。"""
         self.log_textbox.configure(state="normal")
         self.log_textbox.insert(tkinter.END, f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {message}\n")
         self.log_textbox.configure(state="disabled")
         self.log_textbox.see(tkinter.END)
 
+    # ---- Log Sender Callbacks ----
     def browse_source_dir(self):
         dir_path = filedialog.askdirectory(title="选择原始日志目录")
         if dir_path:
@@ -87,7 +103,7 @@ class AppController(customtkinter.CTk):
         if not source or not processed:
             self.log("错误: '原始日志目录' 和 '已处理目录' 不能为空。")
             return
-        
+
         self.log_service.config = self.get_current_config()
         if self.log_service.start_processing(source, processed):
             self.start_button.configure(state="disabled")
@@ -116,6 +132,52 @@ class AppController(customtkinter.CTk):
         self.log("--- 统一测试发送结束 ---")
         self.test_button.configure(state="normal")
 
+    # ---- Event Validator Callbacks ----
+    def start_validation(self):
+        self.validate_button.configure(state="disabled")
+        self.log("--- 开始事件校验(后台) ---")
+        
+        # 从UI收集所有需要的参数
+        validation_params = {
+            "method": self.event_req_method.get(),
+            "url": self.event_list_url.get(),
+            "token": self.event_req_token.get(),
+            "payload_str": self.validator_payload_textbox.get("1.0", tkinter.END).strip()
+        }
+
+        validation_thread = threading.Thread(
+            target=self._validation_thread_target, 
+            args=(validation_params,),
+            daemon=True
+        )
+        validation_thread.start()
+
+    def _validation_thread_target(self, params):
+        success, result = self.event_validator.validate_events(**params)
+        self.after(0, self._on_validation_finished, success, result)
+
+    def _on_validation_finished(self, success, result):
+        self.validator_results_textbox.configure(state="normal")
+        self.validator_results_textbox.delete("1.0", tkinter.END)
+        if success:
+            self.validator_results_textbox.insert(tkinter.END, f"校验完成!\n")
+            self.validator_results_textbox.insert(tkinter.END, f"URL中事件数: {result['extracted_count']}\n")
+            self.validator_results_textbox.insert(tkinter.END, f"缺失事件数: {result['missing_count']}\n")
+            self.validator_results_textbox.insert(tkinter.END, "-" * 50 + "\n")
+            if result['missing_count'] > 0:
+                self.validator_results_textbox.insert(tkinter.END, "缺失的事件列表:\n")
+                for i, name in enumerate(result['missing_names'], 1):
+                    self.validator_results_textbox.insert(tkinter.END, f"{i}. {name}\n")
+            else:
+                self.validator_results_textbox.insert(tkinter.END, "恭喜！没有缺少的事件名称，数据完整！\n")
+        else:
+            self.validator_results_textbox.insert(tkinter.END, f"校验失败!\n")
+            self.validator_results_textbox.insert(tkinter.END, f"错误信息: {result}\n")
+        self.validator_results_textbox.configure(state="disabled")
+        self.log("--- 事件校验结束 ---")
+        self.validate_button.configure(state="normal")
+
+    # ---- Mock Data for Testing ----
     def get_test_data(self):
         return [
             {
