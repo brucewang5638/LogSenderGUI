@@ -19,6 +19,7 @@ jobs:
         run: |
           echo "This job is a placeholder to ensure CI passes on master branch pushes and PRs. No image is built."
 
+
   release:
     strategy:
       matrix:
@@ -48,8 +49,10 @@ jobs:
         run: |
           pyinstaller --onefile --windowed --name LogSenderGUI main.py
 
-      - name: Upload exe artifact
-        uses: actions/upload-artifact@v4
+      - name: Release App
+        uses: ncipollo/release-action@v1
         with:
-          name: LogSenderGUI-exe
-          path: dist/LogSenderGUI.exe
+          draft: false
+          allowUpdates: true
+          artifacts: |
+            dist/LogSenderGUI.exe
