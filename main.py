@@ -151,58 +151,79 @@ class App(customtkinter.CTk):
         ]
 
     def test_send_all(self):
-        self.log("--- 开始统一测试发送 ---")
+        """
+        当用户点击“测试发送”按钮时调用。
+        此方法会禁用按钮并启动一个后台线程来执行实际的发送操作，以防止UI冻结。
+        """
+        self.test_button.configure(state="disabled")
+        self.log("--- 开始统一测试发送(后台) ---")
+        
+        # 在后台线程中运行测试，以避免阻塞GUI
+        test_thread = threading.Thread(target=self._test_send_thread_target, daemon=True)
+        test_thread.start()
+
+    def _test_send_thread_target(self):
+        """
+        这个函数在后台线程中执行，处理实际的测试日志发送。
+        """
         test_data = self.get_test_data()
 
-        # 发送流量日志 (HTTP)
-        self.send_http_log(test_data[0])
+        # 注意：send_..._log方法是阻塞的，但因为它们在工作线程中被调用，所以不会冻z结UI
+        self.send_http_log([test_data[0]])
+        self.send_udp_log([test_data[1]])
 
-        # 发送本地日志 (UDP)
-        self.send_udp_log(test_data[1])
+        # 所有发送操作完成后，安排在主线程中执行收尾工作
+        self.after(0, self._on_test_finished)
 
+    def _on_test_finished(self):
+        """
+        测试完成后，在主GUI线程中调用此方法来更新UI。
+        """
         self.log("--- 统一测试发送结束 ---")
+        self.test_button.configure(state="normal")
 
-    def send_udp_log(self, log_data):
-        self.log("开始发送UDP日志...")
+    def send_udp_log(self, log_batch):
+        log_count = len(log_batch)
+        self.after(0, lambda: self.log(f"开始发送一批 {log_count} 条UDP日志..."))
         ip = self.udp_ip.get()
         port_str = self.udp_port.get()
 
         if not ip or not port_str:
-            self.log("错误: UDP IP地址和端口不能为空。")
+            self.after(0, lambda: self.log("错误: UDP IP地址和端口不能为空。"))
             return
 
         try:
             port = int(port_str)
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            message = json.dumps(log_data, ensure_ascii=False).encode('utf-8')
+            message = json.dumps(log_batch, ensure_ascii=False).encode('utf-8')
             sock.sendto(message, (ip, port))
-            self.log(f"成功发送UDP日志到 {ip}:{port}")
+            self.after(0, lambda: self.log(f"成功发送一批 {log_count} 条UDP日志到 {ip}:{port}"))
         except ValueError:
-            self.log(f"错误: 无效的UDP端口号 '{port_str}'")
+            self.after(0, lambda: self.log(f"错误: 无效的UDP端口号 '{port_str}'"))
         except socket.error as e:
-            self.log(f"错误: 发送UDP时发生套接字错误: {e}")
+            self.after(0, lambda: self.log(f"错误: 发送UDP时发生套接字错误: {e}"))
         except Exception as e:
-            self.log(f"错误: 发送UDP日志时发生未知异常: {e}")
+            self.after(0, lambda: self.log(f"错误: 发送UDP日志时发生未知异常: {e}"))
 
-    def send_http_log(self, log_data):
-        self.log("开始发送HTTP日志...")
+    def send_http_log(self, log_batch):
+        log_count = len(log_batch)
+        self.after(0, lambda: self.log(f"开始发送一批 {log_count} 条HTTP日志..."))
         url = self.http_url.get()
         if not url:
-            self.log("错误: HTTP URL不能为空。")
+            self.after(0, lambda: self.log("错误: HTTP URL不能为空。"))
             return
 
         try:
             headers = {'Content-Type': 'application/json'}
-            # 注意：这里我们只发送单条日志，而不是整个列表
-            response = requests.post(url, data=json.dumps([log_data]), headers=headers, timeout=5)
-            self.log(f"HTTP响应状态码: {response.status_code}")
-            self.log(f"HTTP响应内容: {response.text}")
+            # 直接发送整个批处理列表
+            response = requests.post(url, data=json.dumps(log_batch), headers=headers, timeout=10)
+            self.after(0, lambda: self.log(f"HTTP响应状态码: {response.status_code}"))
             if response.status_code == 200:
-                self.log("HTTP日志发送成功!")
+                self.after(0, lambda: self.log(f"成功发送一批 {log_count} 条HTTP日志!"))
             else:
-                self.log("错误: HTTP日志发送失败。")
+                self.after(0, lambda: self.log(f"错误: HTTP日志发送失败，状态码: {response.status_code}, 内容: {response.text}"))
         except requests.exceptions.RequestException as e:
-            self.log(f"错误: 发送HTTP请求时发生异常: {e}")
+            self.after(0, lambda: self.log(f"错误: 发送HTTP请求时发生异常: {e}"))
 
     def start_processing(self):
         source = self.source_dir.get()
@@ -231,20 +252,14 @@ class App(customtkinter.CTk):
 
         while self.is_processing:
             try:
-                # 只查找.json文件
                 json_files = [f for f in os.listdir(source_dir) if f.lower().endswith('.json')]
                 if not json_files:
-                    # 如果没有文件，短暂休眠以避免CPU占用过高
                     time.sleep(2)
                     continue
 
                 for file_name in json_files:
-                    if not self.is_processing:
-                        break  # 循环内部再次检查停止标志
-
+                    if not self.is_processing: break
                     file_path = os.path.join(source_dir, file_name)
-                    
-                    # 使用self.after在主线程中安全地更新GUI，并正确捕获变量
                     self.after(0, lambda f=file_name: self.log(f"正在处理文件: {f}"))
 
                     try:
@@ -253,25 +268,31 @@ class App(customtkinter.CTk):
 
                         if not isinstance(log_data, list):
                             self.after(0, lambda f=file_name: self.log(f"错误: {f} 的内容不是一个有效的JSON数组。"))
-                            # 移动格式错误的文件
                             os.rename(file_path, os.path.join(processed_dir, file_name))
                             continue
 
+                        # ---- 批处理逻辑 ----
+                        http_batch = []
+                        udp_batch = []
                         for log_entry in log_data:
-                            if not self.is_processing:
-                                break # 在处理单个日志条目时也检查
-
-                            # 判断日志类型
                             if isinstance(log_entry.get('log_type'), int) and 'action_type' not in log_entry:
-                                self.send_http_log(log_entry)
+                                http_batch.append(log_entry)
                             else:
-                                self.send_udp_log(log_entry)
-                            time.sleep(0.01) # 防止发送过快，给UI和网络一些喘息时间
+                                udp_batch.append(log_entry)
+                        
+                        # 发送HTTP批次
+                        if http_batch:
+                            if not self.is_processing: break
+                            self.send_http_log(http_batch)
+                        
+                        # 发送UDP批次
+                        if udp_batch:
+                            if not self.is_processing: break
+                            self.send_udp_log(udp_batch)
+                        # ---- 批处理逻辑结束 ----
 
-                        if not self.is_processing:
-                            break
+                        if not self.is_processing: break
 
-                        # 处理完成后移动文件
                         processed_file_path = os.path.join(processed_dir, file_name)
                         os.rename(file_path, processed_file_path)
                         self.after(0, lambda f=file_name: self.log(f"文件 {f} 处理完成并已移动。"))
@@ -281,13 +302,12 @@ class App(customtkinter.CTk):
                         os.rename(file_path, os.path.join(processed_dir, file_name))
                     except Exception as e:
                         self.after(0, lambda f=file_name, err=e: self.log(f"处理文件 {f} 时发生未知错误: {err}"))
-            
+                if not self.is_processing: break
             except Exception as e:
                 self.after(0, lambda err=e: self.log(f"扫描目录时发生错误: {err}"))
             
-            time.sleep(1) # 完成一轮扫描后等待
+            time.sleep(1)
 
-        # 循环结束后，在主线程中更新UI状态
         self.after(0, self.update_ui_on_stop)
 
     def stop_processing(self):
