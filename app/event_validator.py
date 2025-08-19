@@ -13,7 +13,14 @@ class EventValidator:
         :param complete_event_list: 从配置加载的完整事件名称列表。
         """
         self.logger = logger_callback
-        self.complete_event_names = set(complete_event_list)
+        self.set_complete_event_list(complete_event_list) # Use the new setter here too
+
+    def set_complete_event_list(self, new_list):
+        """
+        更新完整的事件名称列表。
+        """
+        self.complete_event_names = set(new_list)
+        self.logger(f"事件校验器：完整事件列表已更新，共 {len(new_list)} 个事件。")
 
     def validate_events(self, method, url, token, payload_str):
         """

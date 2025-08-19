@@ -93,6 +93,9 @@ class AppController(customtkinter.CTk):
         # For the payload textbox, we need to clear and insert
         self.validator_payload_textbox.delete("1.0", tkinter.END)
         self.validator_payload_textbox.insert("1.0", config.DEFAULT_EVENT_PAYLOAD)
+
+        # --- NEW: Update EventValidator's complete_event_list ---
+        self.event_validator.set_complete_event_list(config.get_complete_event_list())
         self.log("UI元素已根据新配置更新。")
 
     # ---- General Logging ----
