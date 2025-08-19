@@ -44,7 +44,7 @@
 
      event_validator:
        event_list_url: "http://example.com/api/events"
-       default_token: "HKTOKEN ..."
+       default_token: "TOKEN ..."
        default_payload: {}
 
      complete_event_list:

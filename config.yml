@@ -1,20 +1,22 @@
 # 应用配置
 log_sender:
   # 流量日志 (HTTP) 接收URL
-  http_url: http://127.0.0.1:8080/log
+  http_url: http://example.com/log
   # 本地日志 (UDP) 接收IP
   udp_ip: 127.0.0.1
   # 本地日志 (UDP) 接收端口
-  udp_port: 19708
+  udp_port: 9000
 
 event_validator:
   # 事件列表URL
-  event_list_url: http://127.0.0.1:8080/event/list
+  event_list_url: http://example.com/api/events
   # 默认认证Cookie
-  default_token: "TOKEN xxxxxxxx"
+  default_token: "TOKEN ..."
   # 默认请求载荷
-  default_payload:
+  default_payload: {}
 
 # 标准事件的完整列表
 complete_event_list:
- -
+  - EVENT_A
+  - EVENT_B
+  - EVENT_C
