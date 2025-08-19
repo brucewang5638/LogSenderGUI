@@ -1,0 +1,21 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+.venv/
+
+# IDE configuration files
+.idea/
+.vscode/
+*.swp
+
+# PyInstaller
+*.spec
+build/
+dist/
+
+# My Data folders
+mytest/
