@@ -109,6 +109,15 @@ class App(customtkinter.CTk):
             self.source_dir.set(dir_path)
             self.log(f"设置原始日志目录为: {dir_path}")
 
+            # ---- 新增逻辑：自动设置并创建已处理目录 ----
+            processed_dir_path = dir_path + "_processed"
+            try:
+                os.makedirs(processed_dir_path, exist_ok=True)
+                self.processed_dir.set(processed_dir_path)
+                self.log(f"自动设置已处理目录为: {processed_dir_path}")
+            except OSError as e:
+                self.log(f"错误: 创建已处理目录失败: {e}")
+
     def browse_processed_dir(self):
         dir_path = filedialog.askdirectory(title="选择已处理日志存放目录")
         if dir_path:
@@ -203,16 +212,95 @@ class App(customtkinter.CTk):
             self.log("错误: '原始日志目录' 和 '已处理目录' 不能为空。")
             return
 
-        self.log("开始处理...")
+        if not os.path.isdir(source) or not os.path.isdir(processed):
+            self.log("错误: 指定的目录无效或不存在。")
+            return
+
+        self.is_processing = True
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
-        # TODO: 实现文件处理逻辑
+        self.log("开始处理日志文件...")
+
+        # 创建并启动后台处理线程
+        self.processing_thread = threading.Thread(target=self._process_files_loop, daemon=True)
+        self.processing_thread.start()
+
+    def _process_files_loop(self):
+        source_dir = self.source_dir.get()
+        processed_dir = self.processed_dir.get()
+
+        while self.is_processing:
+            try:
+                # 只查找.json文件
+                json_files = [f for f in os.listdir(source_dir) if f.lower().endswith('.json')]
+                if not json_files:
+                    # 如果没有文件，短暂休眠以避免CPU占用过高
+                    time.sleep(2)
+                    continue
+
+                for file_name in json_files:
+                    if not self.is_processing:
+                        break  # 循环内部再次检查停止标志
+
+                    file_path = os.path.join(source_dir, file_name)
+                    
+                    # 使用self.after在主线程中安全地更新GUI，并正确捕获变量
+                    self.after(0, lambda f=file_name: self.log(f"正在处理文件: {f}"))
+
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            log_data = json.load(f)
+
+                        if not isinstance(log_data, list):
+                            self.after(0, lambda f=file_name: self.log(f"错误: {f} 的内容不是一个有效的JSON数组。"))
+                            # 移动格式错误的文件
+                            os.rename(file_path, os.path.join(processed_dir, file_name))
+                            continue
+
+                        for log_entry in log_data:
+                            if not self.is_processing:
+                                break # 在处理单个日志条目时也检查
+
+                            # 判断日志类型
+                            if isinstance(log_entry.get('log_type'), int) and 'action_type' not in log_entry:
+                                self.send_http_log(log_entry)
+                            else:
+                                self.send_udp_log(log_entry)
+                            time.sleep(0.01) # 防止发送过快，给UI和网络一些喘息时间
+
+                        if not self.is_processing:
+                            break
+
+                        # 处理完成后移动文件
+                        processed_file_path = os.path.join(processed_dir, file_name)
+                        os.rename(file_path, processed_file_path)
+                        self.after(0, lambda f=file_name: self.log(f"文件 {f} 处理完成并已移动。"))
+
+                    except json.JSONDecodeError:
+                        self.after(0, lambda f=file_name: self.log(f"错误: {f} JSON格式无效。"))
+                        os.rename(file_path, os.path.join(processed_dir, file_name))
+                    except Exception as e:
+                        self.after(0, lambda f=file_name, err=e: self.log(f"处理文件 {f} 时发生未知错误: {err}"))
+            
+            except Exception as e:
+                self.after(0, lambda err=e: self.log(f"扫描目录时发生错误: {err}"))
+            
+            time.sleep(1) # 完成一轮扫描后等待
+
+        # 循环结束后，在主线程中更新UI状态
+        self.after(0, self.update_ui_on_stop)
 
     def stop_processing(self):
-        self.log("停止处理...")
+        if self.is_processing:
+            self.log("正在请求停止处理...")
+            self.is_processing = False
+            # UI更新将由处理循环结束时触发
+
+    def update_ui_on_stop(self):
+        """在主线程中更新UI以反映停止状态"""
+        self.log("处理已停止。")
         self.start_button.configure(state="normal")
         self.stop_button.configure(state="disabled")
-        # TODO: 实现停止逻辑
 
 if __name__ == "__main__":
     app = App()

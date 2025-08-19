@@ -1,0 +1,64 @@
+[
+  {
+    "agent": "Mozilla/5.0 (Windows NT 6.1; WW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36",
+    "app_protocol": 1,
+    "content_disposition": "inline",
+    "content_length": 1375,
+    "content_range": "bytes 5000-10000",
+    "content_type": "file",
+    "cookie": "-36",
+    "data_type": 2,
+    "device_id": "800020003006494",
+    "device_ip": "127.0.0.1",
+    "device_port_id": 2,
+    "dip": "192.168.1.203",
+    "dipv6": "",
+    "dmac": "00:50:56:22:F1:1A",
+    "dport": 80,
+    "host": "192.168.1.203",
+    "http_req_header": "GET//",
+    "http_res_code": 200,
+    "http_res_header": "200 OK",
+    "interface_icon": "核心交换",
+    "log_type": 3,
+    "method": "GET",
+    "network_protocol": 0,
+    "origin": null,
+    "referer": "http://192.168.1.203/",
+    "sess_id": "19d1656b-ef67-11ef-9d4b-6c92bfb82922",
+    "session_protocol": -99,
+    "setcookie": null,
+    "sip": "192.168.0.105",
+    "sipv6": "",
+    "smac": "00:50:56:22:7D:8A",
+    "sport": 64167,
+    "time": 1740041155397,
+    "transport_protocol": 6,
+    "uri": "/login1",
+    "xff": "10.95.58.130"
+  },
+  {
+    "action_type": "主机在线信息上报",
+    "behaviour_type": "一般行为",
+    "company": "甄好公司",
+    "critical_level": "信息",
+    "handle": "审计",
+    "host_info_list": [
+      {
+        "host_ip": "192.168.0.105",
+        "is_online": "0",
+        "mac": "00:50:56:22:7D:8A"
+      },
+      {
+        "host_ip": "192.168.0.109",
+        "is_online": "1",
+        "mac": "00:50:56:22:7D:8E"
+      }
+    ],
+    "log_time": "2025-02-20 16:45:55",
+    "log_type": "在线主机列表日志",
+    "product": "主机监控与审计系统",
+    "result": "成功",
+    "send_time": "2025-02-20 16:45:55"
+  }
+]
