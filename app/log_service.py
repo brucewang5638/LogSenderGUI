@@ -75,6 +75,9 @@ class LogService:
                         if not self.is_processing: break
                         
                         processed_file_path = os.path.join(processed_dir, file_name)
+                        if os.path.exists(processed_file_path):
+                            os.remove(processed_file_path)
+                            self.log(f"警告: 目标文件 {file_name} 已存在，已覆盖。")
                         os.rename(file_path, processed_file_path)
                         self.log(f"文件 {file_name} 处理完成并已移动。")
                     except json.JSONDecodeError:
